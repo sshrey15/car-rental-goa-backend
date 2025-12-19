@@ -42,7 +42,7 @@ export const checkAvailabilityOfCar = async (req, res) => {
 export const createBooking = async (req, res) => {
   try {
     const { _id } = req.user;
-    const { car, pickupDate, returnDate } = req.body;
+    const { car, pickupDate, returnDate, amountPaid } = req.body;
 
     const isAvailable = await checkAvailability(car, pickupDate, returnDate);
     if (!isAvailable) {
@@ -64,6 +64,7 @@ export const createBooking = async (req, res) => {
       pickupDate,
       returnDate,
       price,
+      amountPaid: amountPaid || price // Default to full price if not specified, or 0 if we want to track partial
     });
 
     res.json({ success: true, message: "Booking Created" });
@@ -78,6 +79,7 @@ export const getUserBookings = async (req, res) => {
     const { _id } = req.user;
     const bookings = await Booking.find({ user: _id })
       .populate("car")
+      .populate("owner", "name phone email") // Populate owner details
       .sort({ createdAt: -1 });
     res.json({ success: true, bookings });
   } catch (error) {
