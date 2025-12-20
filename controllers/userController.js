@@ -2,6 +2,7 @@ import User from "../models/User.js"
 import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import Car from "../models/Car.js";
+import axios from 'axios';
 
 
 
@@ -22,6 +23,23 @@ export const registerUser = async (req, res)=>{
         const userExists = await User.findOne({email})
         if(userExists){
             return res.json({success: false, message: 'User already exists'})
+        }
+
+        const phoneExists = await User.findOne({phone})
+        if(phoneExists){
+             if (phoneExists.password) {
+                 return res.json({success: false, message: 'User already exists with this phone number'})
+             } else {
+                 // Update existing OTP user
+                 const hashedPassword = await bcrypt.hash(password, 10)
+                 phoneExists.name = name;
+                 phoneExists.email = email;
+                 phoneExists.password = hashedPassword;
+                 await phoneExists.save();
+                 
+                 const token = generateToken(phoneExists._id.toString())
+                 return res.json({success: true, token})
+             }
         }
 
         const hashedPassword = await bcrypt.hash(password, 10)
@@ -63,59 +81,86 @@ export const sendOtp = async (req, res) => {
         if (!phone) {
             return res.json({ success: false, message: "Phone number is required" });
         }
-        // In a real application, you would integrate with an SMS provider like Twilio here.
-        // For this demo, we'll just simulate sending an OTP.
+
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
         
-        // Store OTP in database or cache (e.g., Redis) associated with the phone number
-        // For simplicity, we'll just return it in the response for testing purposes
-        // In production, NEVER return the OTP in the response.
-        
-        // Check if user exists with this phone
         let user = await User.findOne({ phone });
+        
         if (!user) {
-             // If user doesn't exist, we might want to create a temporary record or handle registration flow
-             // For now, let's assume we only allow login for existing users or handle registration separately
-             // But for OTP login, often we create a user if they don't exist (or partial user)
-             // Let's just proceed.
+            
+            user = await User.create({ 
+                phone,
+                name: `User-${phone.slice(-4)}` // Default name
+            });
         }
 
-        console.log(`OTP for ${phone} is ${otp}`);
+        user.otp = otp;
+        user.otpExpiry = Date.now() + 10 * 60 * 1000; // 10 minutes expiry
+        await user.save();
 
-        res.json({ success: true, message: "OTP sent successfully", otp }); // Remove otp from response in production
+        let formattedPhone = phone.replace(/\D/g, ''); // Remove non-digits
+        if (formattedPhone.length === 10) {
+            formattedPhone = '91' + formattedPhone;
+        }
+
+        const whatsappUrl = `https://graph.facebook.com/v17.0/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`;
+        
+        try {
+            const response = await axios.post(whatsappUrl, {
+                messaging_product: "whatsapp",
+                to: formattedPhone,
+                type: "text",
+                text: {
+                    body: `Your OTP for Car Rental Login is: ${otp}`
+                }
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${process.env.WHATSAPP_TOKEN}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            console.log("WhatsApp API Response:", response.data);
+            console.log(`OTP for ${phone} sent via WhatsApp: ${otp}`);
+            res.json({ success: true, message: "OTP sent successfully to your WhatsApp" });
+
+        } catch (whatsappError) {
+            console.error("WhatsApp API Error:", whatsappError.response ? whatsappError.response.data : whatsappError.message);
+            return res.json({ success: false, message: "Failed to send OTP via WhatsApp. Please try again." });
+        }
+
     } catch (error) {
         console.log(error.message);
         res.json({ success: false, message: error.message });
     }
 };
 
-// Login with OTP
+
 export const loginWithOtp = async (req, res) => {
     try {
         const { phone, otp } = req.body;
         
-        // Verify OTP (In real app, check against stored OTP)
-        // For demo, we'll accept any 6 digit OTP or a specific hardcoded one for testing if we didn't store it
-        // Since we didn't store it in the previous step in a DB, we can't verify it properly without a DB change.
-        // Let's assume for this demo that the client sends back the OTP they received (INSECURE - purely for demo flow)
-        // OR we can just say if OTP is '123456' it works.
-        
-        if (otp !== '123456') { // Hardcoded for demo simplicity as we haven't set up OTP storage
-             return res.json({ success: false, message: "Invalid OTP" });
+        if (!phone || !otp) {
+            return res.json({ success: false, message: "Phone and OTP are required" });
         }
 
-        let user = await User.findOne({ phone });
-
+        const user = await User.findOne({ phone });
         if (!user) {
-            // Create new user if not exists (optional, depends on requirements)
-            // user = await User.create({ 
-            //     name: "New User", 
-            //     email: `${phone}@example.com`, // Placeholder
-            //     phone, 
-            //     password: await bcrypt.hash(Math.random().toString(36), 10) 
-            // });
-            return res.json({ success: false, message: "User not found. Please register first." });
+            return res.json({ success: false, message: "User not found" });
         }
+
+        if (!user.otp || user.otp !== otp) {
+            return res.json({ success: false, message: "Invalid OTP" });
+        }
+
+        if (user.otpExpiry < Date.now()) {
+            return res.json({ success: false, message: "OTP has expired" });
+        }
+
+       
+        user.otp = null;
+        user.otpExpiry = null;
+        await user.save();
 
         const token = generateToken(user._id.toString());
         res.json({ success: true, token });
@@ -126,7 +171,8 @@ export const loginWithOtp = async (req, res) => {
     }
 };
 
-// Get User data using Token (JWT)
+
+
 export const getUserData = async (req, res) =>{
     try {
         const {user} = req;
