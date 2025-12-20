@@ -8,6 +8,7 @@ import {
   getOwnerCars,
   toggleCarAvailability,
   updateUserImage,
+  updateCar
 } from "../controllers/ownerController.js";
 import upload from "../middleware/multer.js";
 
@@ -15,6 +16,7 @@ const ownerRouter = express.Router();
 
 ownerRouter.post("/change-role", protect, changeRoleToOwner);
 ownerRouter.post("/add-car", protect, upload.array("images"), protect, addCar);
+ownerRouter.post("/update-car", protect, updateCar);
 ownerRouter.get("/cars", protect, getOwnerCars);
 ownerRouter.post("/toggle-car", protect, toggleCarAvailability);
 ownerRouter.post("/delete-car", protect, deleteCar);

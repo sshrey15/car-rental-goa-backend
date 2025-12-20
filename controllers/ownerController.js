@@ -16,8 +16,6 @@ export const changeRoleToOwner = async (req, res) => {
   }
 };
 
-
-
 export const addCar = async (req, res) => {
   try {
     const { _id } = req.user;
@@ -52,9 +50,10 @@ export const addCar = async (req, res) => {
 
     const imageUrls = await Promise.all(uploadPromises);
 
-    await Car.create({ ...car, owner: _id, images: imageUrls });
+    // Set isApproved to false by default when adding a new car
+    await Car.create({ ...car, owner: _id, images: imageUrls, isApproved: false });
 
-    res.json({ success: true, message: "Car Added" });
+    res.json({ success: true, message: "Car Added. Waiting for Admin Approval." });
   } catch (error) {
     console.log(error.message);
     if (error.message.includes("Your account cannot be authenticated")) {
@@ -66,46 +65,6 @@ export const addCar = async (req, res) => {
     res.json({ success: false, message: error.message });
   }
 };
-
-// export const addCar = async (req, res)=>{
-//     try {
-//         const {_id} = req.user;
-//         let car = JSON.parse(req.body.carData);
-//         const imageFile = req.file;
-
-//         console.log("CAR DATA:", car);
-
-//         // Upload Image to ImageKit
-//         const fileBuffer = fs.readFileSync(imageFile.path)
-//         const response = await imagekit.upload({
-//             file: fileBuffer,
-//             fileName: imageFile.originalname,
-//             folder: '/cars'
-//         })
-
-//         // optimization through imagekit URL transformation
-//         var optimizedImageUrl = imagekit.url({
-//             path : response.filePath,
-//             transformation : [
-//                 {width: '1280'}, // Width resizing
-//                 {quality: 'auto'}, // Auto compression
-//                 { format: 'webp' }  // Convert to modern format
-//             ]
-//         });
-
-//         const image = optimizedImageUrl;
-//         await Car.create({...car, owner: _id, image})
-
-//         res.json({success: true, message: "Car Added"})
-
-//     } catch (error) {
-//         console.log(error.message);
-//         if (error.message.includes("Your account cannot be authenticated")) {
-//             return res.json({success: false, message: "Server Error: ImageKit authentication failed. Please check server configuration."})
-//         }
-//         res.json({success: false, message: error.message})
-//     }
-// }
 
 // API to List Owner Cars
 export const getOwnerCars = async (req, res) => {
@@ -240,6 +199,32 @@ export const updateUserImage = async (req, res) => {
 
     await User.findByIdAndUpdate(_id, { image });
     res.json({ success: true, message: "Image Updated" });
+  } catch (error) {
+    console.log(error.message);
+    res.json({ success: false, message: error.message });
+  }
+};
+
+export const updateCar = async (req, res) => {
+  try {
+    const { _id } = req.user;
+    const { carId, carData } = req.body;
+    
+    const car = await Car.findById(carId);
+
+    if (!car) {
+        return res.json({ success: false, message: "Car not found" });
+    }
+
+    // Checking if car belongs to the user
+    if (car.owner.toString() !== _id.toString()) {
+      return res.json({ success: false, message: "Unauthorized" });
+    }
+
+    // Update car details and set isApproved to false
+    await Car.findByIdAndUpdate(carId, { ...carData, isApproved: false });
+
+    res.json({ success: true, message: "Car Updated. Waiting for Admin Approval." });
   } catch (error) {
     console.log(error.message);
     res.json({ success: false, message: error.message });

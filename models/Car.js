@@ -20,6 +20,7 @@ const carSchema = new mongoose.Schema(
     location: { type: String, required: true },
     description: { type: String, required: true },
     isAvaliable: { type: Boolean, default: true },
+    isApproved: { type: Boolean, default: false },
   },
   { timestamps: true },
 );
