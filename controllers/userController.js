@@ -14,10 +14,29 @@ const generateToken = (userId)=>{
 
 export const registerUser = async (req, res)=>{
     try {
-        const {name, email, password, phone} = req.body
+        const {name, email, password, phone, otp} = req.body
         console.log("DTAA", name, email, password, phone);
         if(!name || !email || !password || !phone || password.length < 8){
             return res.json({success: false, message: 'Fill all the fields'})
+        }
+
+        // Check if OTP verification is required
+        if (otp) {
+            // Verify OTP for signup
+            const tempUser = await User.findOne({ phone, otp, otpExpiry: { $gt: Date.now() } });
+            if (!tempUser) {
+                return res.json({ success: false, message: 'Invalid or expired OTP' });
+            }
+            // Clear OTP after verification
+            tempUser.otp = null;
+            tempUser.otpExpiry = null;
+            tempUser.name = name;
+            tempUser.email = email;
+            tempUser.password = await bcrypt.hash(password, 10);
+            await tempUser.save();
+            
+            const token = generateToken(tempUser._id.toString());
+            return res.json({ success: true, token });
         }
 
         const userExists = await User.findOne({email})
@@ -77,7 +96,7 @@ export const loginUser = async (req, res)=>{
 
 export const sendOtp = async (req, res) => {
     try {
-        const { phone } = req.body;
+        const { phone, isSignup } = req.body;
         if (!phone) {
             return res.json({ success: false, message: "Phone number is required" });
         }
@@ -86,7 +105,13 @@ export const sendOtp = async (req, res) => {
         
         let user = await User.findOne({ phone });
         
-        if (!user) {
+        if (!user && isSignup) {
+            // Create a temporary user for signup OTP verification
+            user = await User.create({ 
+                phone,
+                name: `User-${phone.slice(-4)}`
+            });
+        } else if (!user) {
             return res.json({ success: false, message: "User not found. Please register first." });
         }
 

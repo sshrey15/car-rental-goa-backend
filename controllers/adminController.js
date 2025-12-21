@@ -27,7 +27,6 @@ export const getDashboardStats = async (req, res) => {
     }
 };
 
-
 export const getAllBookings = async (req, res) => {
     try {
         const bookings = await Booking.find({})
@@ -35,7 +34,6 @@ export const getAllBookings = async (req, res) => {
             .populate("car", "brand model image")
             .populate("owner", "name email phone")
             .sort({ createdAt: -1 });
-
         res.json({ success: true, bookings });
     } catch (error) {
         console.log(error);
@@ -56,7 +54,7 @@ export const getAllCars = async (req, res) => {
     }
 };
 
-// Get All Users
+
 export const getAllUsers = async (req, res) => {
     try {
         const users = await User.find({}).sort({ createdAt: -1 });
@@ -67,7 +65,7 @@ export const getAllUsers = async (req, res) => {
     }
 };
 
-// Approve/Reject Car
+
 export const approveCar = async (req, res) => {
     try {
         const { carId, isApproved } = req.body;
