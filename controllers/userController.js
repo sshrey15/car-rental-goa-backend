@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt'
 import jwt from 'jsonwebtoken'
 import Car from "../models/Car.js";
 import Location from "../models/Location.js";
+import Coupon from "../models/Coupon.js";
 import { sendOTP as twilioSendOTP, verifyOTP as twilioVerifyOTP } from "../configs/twilio.js";
 
 
@@ -236,6 +237,27 @@ export const checkPhoneExists = async (req, res) => {
         const user = await User.findOne({ phone });
         res.json({ success: true, exists: !!user });
 
+    } catch (error) {
+        console.log(error.message);
+        res.json({ success: false, message: error.message });
+    }
+};
+
+// Get Active Coupons (Public - for displaying available promo codes)
+export const getActiveCouponsPublic = async (req, res) => {
+    try {
+        const now = new Date();
+        const coupons = await Coupon.find({
+            isActive: true,
+            validFrom: { $lte: now },
+            validUntil: { $gte: now },
+            $or: [
+                { usageLimit: null },
+                { $expr: { $lt: ["$usedCount", "$usageLimit"] } }
+            ]
+        }).select('code description discountType discountValue minBookingAmount maxDiscount validUntil').sort({ discountValue: -1 });
+        
+        res.json({ success: true, coupons });
     } catch (error) {
         console.log(error.message);
         res.json({ success: false, message: error.message });

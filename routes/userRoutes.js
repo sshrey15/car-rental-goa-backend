@@ -8,7 +8,8 @@ import {
     sendOTPController,
     verifyOTPAndRegister,
     verifyOTPAndLogin,
-    checkPhoneExists
+    checkPhoneExists,
+    getActiveCouponsPublic
 } from "../controllers/userController.js";
 import { protect } from "../middleware/auth.js";
 
@@ -28,5 +29,6 @@ userRouter.post('/check-phone', checkPhoneExists)
 // Public routes
 userRouter.get('/cars', getCars)
 userRouter.get('/locations', getLocations)
+userRouter.get('/coupons/active', getActiveCouponsPublic)
 
 export default userRouter;
