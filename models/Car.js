@@ -6,7 +6,7 @@ const carSchema = new mongoose.Schema(
     owner: { type: ObjectId, ref: "User" },
     brand: { type: String, required: true },
     model: { type: String, required: true },
-    // image: {type: String, required: true},
+
     images: {
       type: [String],
       required: true,
@@ -21,6 +21,7 @@ const carSchema = new mongoose.Schema(
     description: { type: String, required: true },
     isAvaliable: { type: Boolean, default: true },
     isApproved: { type: Boolean, default: false },
+    appliedCoupon: { type: ObjectId, ref: "Coupon", default: null },
   },
   { timestamps: true },
 );
